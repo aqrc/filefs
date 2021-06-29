@@ -5,9 +5,11 @@ import ru.aqrcx.lib.filefs.internal.util.ByteUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 
 /**
  * <code>SimpleFilesystemHandler</code> is an implementation
@@ -71,8 +73,62 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         return fs.readLong();
     }
 
+    /**
+     * Writes following data in the end of file-filesystem:
+     *  - length of {@code filename} in bytes (int, 4 bytes)
+     *  - {@code filename}
+     *  - length of file's data (long, 8 bytes)
+     *  - file's content (from {@code dataStream})
+     *
+     * @param filename Name which will be assigned to file inside filesystem
+     * @param dataStream File data
+     * @throws IOException If some I/O error occur
+     */
+    @Override
+    public void write(String filename, InputStream dataStream) throws IOException {
+        int filenameLen = filename.length();
+        long fileLength = fs.length();
+
+        FileChannel channel = fs.getChannel();
+        channel.position(fileLength);
+
+        ByteBuffer fileLenFilenameBuffer = ByteBuffer.allocate(Long.BYTES + filenameLen)
+                .put(ByteUtils.intToBytes(filenameLen))
+                .put(filename.getBytes(StandardCharsets.UTF_8));
+        fileLenFilenameBuffer.flip();
+        channel.write(fileLenFilenameBuffer);
+
+        long offsetOfFileSize = channel.position();
+        channel.position(offsetOfFileSize + Long.BYTES);
+
+        int bytesReadFromStreamTotal = 0;
+        byte[] partOfInput = new byte[128];
+        while (true) {
+            int bytesReadFromStreamLast = dataStream.read(partOfInput, 0, partOfInput.length);
+
+            if (bytesReadFromStreamLast < 0) {
+                break;
+            }
+
+            bytesReadFromStreamTotal += bytesReadFromStreamLast;
+            ByteBuffer partOfInputBuffer = ByteBuffer.allocate(bytesReadFromStreamLast)
+                    .put(partOfInput, 0, bytesReadFromStreamLast);
+            partOfInputBuffer.flip();
+            channel.write(partOfInputBuffer);
+        }
+
+        channel.position(offsetOfFileSize);
+        channel.write(ByteUtils.longToBytes(bytesReadFromStreamTotal));
+        channel.close();
+    }
+
+    @Override
+    public void detach() throws IOException {
+        fs.close();
+    }
+
     @Override
     protected void finalize() throws IOException {
-        fs.close();
+        detach();
     }
 }
