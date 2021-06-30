@@ -2,6 +2,7 @@ package ru.aqrcx.lib.filefs;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * The <code>FileSystemHandler</code> interface provides
@@ -15,11 +16,11 @@ public interface FilesystemHandler {
      * Creates a new file from {@code stream}
      * with {@code filename} in the filesystem.
      *
-     * @param filename Name which will be assigned to file inside filesystem
+     * @param filename Name which will be assigned to the file inside filesystem
      * @param dataStream File data
      * @throws IOException If some I/O error occur
      */
-    void write(String filename, InputStream dataStream) throws IOException;
+    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream) throws IOException;
 
     /**
      * Syncs in-memory data with the filesystem,
