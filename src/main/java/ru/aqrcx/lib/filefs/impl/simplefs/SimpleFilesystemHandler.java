@@ -9,7 +9,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -20,12 +23,13 @@ import java.util.function.Consumer;
  * TODO: explain principle
  */
 public class SimpleFilesystemHandler implements FilesystemHandler {
-    private final RandomAccessFile fs;
     public final static Long VERSION = 1L;
     final static int VERSION_BYTES = Long.BYTES;
     final static int FILE_SIZE_BYTES = Long.BYTES;
     final static int FILE_NAME_SIZE_BYTES = Integer.BYTES;
 
+    private final RandomAccessFile fs;
+    private final FileChannel channel;
     /**
      * Initializes a {@code SimpleFilesystemHandler}
      * with an already existing filesystem from a {@code file}.
@@ -34,6 +38,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      */
     private SimpleFilesystemHandler(File file) throws IOException {
         this.fs = new RandomAccessFile(file, "rws");
+        this.channel = fs.getChannel();
 
         Long fsVersion = getVersion();
         if (!VERSION.equals(fsVersion)) {
@@ -126,10 +131,10 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      *         (contains an Exception if I/O error occurred)
      */
     @Override
-    public CompletableFuture<Void> writeAsync(String filename, InputStream source){
+    public CompletableFuture<Void> writeAsync(String filename, InputStream source, long sourceSize){
         return wrapInFuture((future) -> {
             try {
-                write(filename, source);
+                write(filename, source, sourceSize);
                 future.complete(null);
             } catch (IOException e) {
                 future.completeExceptionally(
@@ -138,40 +143,35 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         });
     }
 
-    private void write(String filename, InputStream source) throws IOException {
+    private void write(String filename, InputStream source, long sourceSize) throws IOException {
         int filenameLen = filename.length();
-        long fileLength = fs.length();
+        int filePropertiesSize = FILE_NAME_SIZE_BYTES + filenameLen + FILE_SIZE_BYTES;
 
-        FileChannel channel = fs.getChannel();
-        channel.position(fileLength);
+        synchronized (this) {
+            long fsLen = channel.size();
+            FileLock lock = channel.lock(fsLen, filePropertiesSize + sourceSize, false);
+            channel.position(fsLen);
 
-        ByteBuffer fileLenFilenameBuffer = ByteBuffer.allocate(FILE_NAME_SIZE_BYTES + filenameLen)
-                .put(ByteUtils.intToBytes(filenameLen))
-                .put(filename.getBytes(StandardCharsets.UTF_8));
-        fileLenFilenameBuffer.flip();
-        channel.write(fileLenFilenameBuffer);
+            ByteBuffer filePropertiesBuffer =
+                    ByteBuffer.allocate(filePropertiesSize)
+                            .put(ByteUtils.intToBytes(filenameLen))
+                            .put(filename.getBytes(StandardCharsets.UTF_8))
+                            .put(ByteUtils.longToBytes(sourceSize));
+            filePropertiesBuffer.flip();
+            channel.write(filePropertiesBuffer);
 
-        long offsetOfFileSize = channel.position();
-        channel.position(offsetOfFileSize + FILE_SIZE_BYTES);
+            ReadableByteChannel sourceChannel = Channels.newChannel(source);
+            channel.transferFrom(sourceChannel, channel.size(), sourceSize);
 
-        int bytesReadFromSourceTotal = 0;
-        int bytesReadFromSourceLast;
-        byte[] partOfInput = new byte[128];
-        while ((bytesReadFromSourceLast = source.read(partOfInput, 0, partOfInput.length)) != -1) {
-            bytesReadFromSourceTotal += bytesReadFromSourceLast;
-            ByteBuffer partOfInputBuffer = ByteBuffer.allocate(bytesReadFromSourceLast)
-                    .put(partOfInput, 0, bytesReadFromSourceLast);
-            partOfInputBuffer.flip();
-            channel.write(partOfInputBuffer);
+            lock.release();
+            sourceChannel.close();
         }
-
-        channel.position(offsetOfFileSize);
-        channel.write(ByteUtils.longToBytes(bytesReadFromSourceTotal));
-        channel.close();
     }
 
     @Override
     public void detach() throws IOException {
+        channel.force(true);
+        channel.close();
         fs.close();
     }
 

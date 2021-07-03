@@ -20,7 +20,7 @@ public interface FilesystemHandler {
      * @param dataStream File data
      * @throws IOException If some I/O error occur
      */
-    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream) throws IOException;
+    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize) throws IOException;
 
     /**
      * Syncs in-memory data with the filesystem,
