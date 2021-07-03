@@ -21,8 +21,10 @@ import java.util.function.Consumer;
  */
 public class SimpleFilesystemHandler implements FilesystemHandler {
     private final RandomAccessFile fs;
-    private final static int VERSION_SIZE = Long.BYTES;
     public final static Long VERSION = 1L;
+    final static int VERSION_BYTES = Long.BYTES;
+    final static int FILE_SIZE_BYTES = Long.BYTES;
+    final static int FILE_NAME_SIZE_BYTES = Integer.BYTES;
 
     /**
      * Initializes a {@code SimpleFilesystemHandler}
@@ -75,7 +77,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
                 future.complete(new SimpleFilesystemHandler(file));
             } catch (IOException e) {
                 future.completeExceptionally(
-                        new FileFsException("Exception occurred on FS init", e));
+                        new FileFsException("Exception occurred on FS attach", e));
             }
         });
     }
@@ -89,8 +91,8 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         RandomAccessFile filesystem = new RandomAccessFile(file, "rw");
         FileChannel channel = filesystem.getChannel();
 
-        channel.truncate(VERSION_SIZE);
-        channel.write(ByteBuffer.allocateDirect(VERSION_SIZE));
+        channel.truncate(VERSION_BYTES);
+        channel.write(ByteBuffer.allocateDirect(VERSION_BYTES));
 
         channel.position(0);
         channel.write(ByteUtils.longToBytes(VERSION));
@@ -103,7 +105,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     /**
-     * @return superblock of this filesystem
+     * @return Version of this filesystem
      * @throws IOException If some I/O error occur
      */
     Long getVersion() throws IOException {
@@ -143,14 +145,14 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         FileChannel channel = fs.getChannel();
         channel.position(fileLength);
 
-        ByteBuffer fileLenFilenameBuffer = ByteBuffer.allocate(Long.BYTES + filenameLen)
+        ByteBuffer fileLenFilenameBuffer = ByteBuffer.allocate(FILE_NAME_SIZE_BYTES + filenameLen)
                 .put(ByteUtils.intToBytes(filenameLen))
                 .put(filename.getBytes(StandardCharsets.UTF_8));
         fileLenFilenameBuffer.flip();
         channel.write(fileLenFilenameBuffer);
 
         long offsetOfFileSize = channel.position();
-        channel.position(offsetOfFileSize + Long.BYTES);
+        channel.position(offsetOfFileSize + FILE_SIZE_BYTES);
 
         int bytesReadFromSourceTotal = 0;
         int bytesReadFromSourceLast;

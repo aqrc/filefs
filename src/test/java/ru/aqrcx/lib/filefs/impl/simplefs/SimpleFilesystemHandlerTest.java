@@ -65,9 +65,9 @@ public class SimpleFilesystemHandlerTest {
                 .join();
 
         long expectedFsFileSizeAfterWrite = fsFileLenAfterInit
-                + Integer.BYTES
+                + SimpleFilesystemHandler.FILE_NAME_SIZE_BYTES
                 + fileName.getBytes(StandardCharsets.UTF_8).length
-                + Long.BYTES
+                + SimpleFilesystemHandler.FILE_SIZE_BYTES
                 + fileToWriteLen;
 
         assertEquals(expectedFsFileSizeAfterWrite, fsFile.length());
