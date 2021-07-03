@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * <code>SimpleFilesystemHandler</code> is an implementation
@@ -29,12 +30,12 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @param file A valid and existing file
      * @throws IOException When {@code file} not found or other I/O error occurs
      */
-    public SimpleFilesystemHandler(File file) throws IOException {
+    private SimpleFilesystemHandler(File file) throws IOException {
         this.fs = new RandomAccessFile(file, "rws");
 
         Long fsVersion = getVersion();
         if (!VERSION.equals(fsVersion)) {
-            // TODO something for back compatibility or a factory
+            // TODO something for back compatibility, maybe a factory
         }
     }
 
@@ -49,19 +50,34 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @return CompletableFuture with a handler for the {@code file}'s filesystem
      *         or with an Exception if I/O error occurred
      */
-    public static CompletableFuture<SimpleFilesystemHandler> initFileSystemAsync(File file) {
-        CompletableFuture<SimpleFilesystemHandler> initResult = new CompletableFuture<>();
-
-        CompletableFuture.runAsync(() -> {
+    public static CompletableFuture<SimpleFilesystemHandler> initNewFilesystemAsync(File file) {
+        return wrapInFuture((future) -> {
             try {
-                initResult.complete(initFileSystem(file));
+                future.complete(initFileSystem(file));
             } catch (IOException e) {
-                initResult.completeExceptionally(
+                future.completeExceptionally(
                         new FileFsException("Exception occurred on FS init", e));
             }
         });
+    }
 
-        return initResult;
+
+    /**
+     * A method which opens the specified {@code file} as a filesystem.
+     * Filesystem in a file must be initialized in a file beforehand.
+     * @param file An existing file which already contains a filesystem
+     * @return CompletableFuture with a handler for the {@code file}'s filesystem
+     *         or with an Exception if I/O error occurred
+     */
+    public static CompletableFuture<SimpleFilesystemHandler> attachExistingFilesystemAsync(File file) {
+        return wrapInFuture((future) -> {
+            try {
+                future.complete(new SimpleFilesystemHandler(file));
+            } catch (IOException e) {
+                future.completeExceptionally(
+                        new FileFsException("Exception occurred on FS init", e));
+            }
+        });
     }
 
     /**
@@ -109,19 +125,15 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      */
     @Override
     public CompletableFuture<Void> writeAsync(String filename, InputStream source){
-        CompletableFuture<Void> writeResult = new CompletableFuture<>();
-
-        CompletableFuture.runAsync(() -> {
+        return wrapInFuture((future) -> {
             try {
                 write(filename, source);
-                writeResult.complete(null);
+                future.complete(null);
             } catch (IOException e) {
-                writeResult.completeExceptionally(
+                future.completeExceptionally(
                         new FileFsException("Exception occurred on file \"" + filename + "\" write", e));
             }
         });
-
-        return writeResult;
     }
 
     private void write(String filename, InputStream source) throws IOException {
@@ -164,5 +176,11 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     @Override
     protected void finalize() throws IOException {
         detach();
+    }
+
+    private static <T> CompletableFuture<T> wrapInFuture(Consumer<CompletableFuture<T>> consumer) {
+        CompletableFuture<T> result = new CompletableFuture<>();
+        CompletableFuture.runAsync(() -> consumer.accept(result));
+        return result;
     }
 }

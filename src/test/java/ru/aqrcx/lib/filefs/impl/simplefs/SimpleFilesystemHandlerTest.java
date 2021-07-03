@@ -23,7 +23,18 @@ public class SimpleFilesystemHandlerTest {
     @Test
     void should_correctly_init_fs_and_read_its_version() throws IOException {
         File emptyFile = tempDir.resolve("should_correctly_init_fs_and_read_its_version").toFile();
-        SimpleFilesystemHandler fsHandler = SimpleFilesystemHandler.initFileSystemAsync(emptyFile).join();
+        SimpleFilesystemHandler fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(emptyFile).join();
+
+        Long version = fsHandler.getVersion();
+        assertEquals(SimpleFilesystemHandler.VERSION, version);
+
+        fsHandler.detach();
+    }
+
+    @Test
+    void should_correctly_attach_fs_and_read_its_version() throws IOException, URISyntaxException {
+        File fsFile = getFileFromResources("emptyFs");
+        SimpleFilesystemHandler fsHandler = SimpleFilesystemHandler.attachExistingFilesystemAsync(fsFile).join();
 
         Long version = fsHandler.getVersion();
         assertEquals(SimpleFilesystemHandler.VERSION, version);
@@ -34,7 +45,7 @@ public class SimpleFilesystemHandlerTest {
     @Test
     void should_write_correct_amount_of_bytes_to_fs() throws URISyntaxException, IOException {
         File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
-        SimpleFilesystemHandler fsHandler = SimpleFilesystemHandler.initFileSystemAsync(fsFile).join();
+        SimpleFilesystemHandler fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
         long fsFileLenAfterInit = fsFile.length();
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
