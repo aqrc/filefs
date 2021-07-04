@@ -18,11 +18,11 @@ public interface FilesystemHandler {
      * with {@code filename} in the filesystem.
      *
      * @param filename Name which will be assigned to file inside filesystem
-     * @param dataStream File data
+     * @param source File data
      * @param sourceSize Length of file data in bytes
      * @return CompletableFuture which indicates the result of write
      */
-    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize);
+    CompletableFuture<Void> writeAsync(String filename, InputStream source, long sourceSize);
 
     /**
      * Method deletes the file with {@code filename}
@@ -40,6 +40,17 @@ public interface FilesystemHandler {
      * @return CompletableFuture which indicates the result of read
      */
     CompletableFuture<Void> readAsync(String filename, OutputStream destination);
+
+    /**
+     * Updates file with {@code filename} existing
+     * in the filesystem with data from {@code stream}.
+     * Exact behavior depends on implementation.
+     * @param filename Name which will be assigned to file inside filesystem
+     * @param source File data
+     * @param sourceSize Length of file data in bytes
+     * @return CompletableFuture which indicates the result of update
+     */
+    CompletableFuture<Void> updateAsync(String filename, InputStream source, long sourceSize);
 
     /**
      * Syncs in-memory data with the filesystem,

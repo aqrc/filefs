@@ -53,7 +53,7 @@ public class SimpleFilesystemHandlerTest {
         long fileToWriteLen = fileToWrite.length();
 
         String fileName = "first file";
-        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+        writeFileInFs(fileName, fileToWrite, fileToWriteLen);
 
         long expectedFsFileSizeAfterWrite = fsFileLenAfterInit
                 + SimpleFilesystemHandler.getFilePropertiesSize(fileName.getBytes(StandardCharsets.UTF_8).length)
@@ -71,7 +71,7 @@ public class SimpleFilesystemHandlerTest {
         long fileToWriteLen = fileToWrite.length();
 
         String fileName = "first file";
-        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+        writeFileInFs(fileName, fileToWrite, fileToWriteLen);
 
         File destinationFile = tempDir.resolve("should_write_to_fs_then_read_it-DEST").toFile();
         FileOutputStream destination = new FileOutputStream(destinationFile);
@@ -108,7 +108,7 @@ public class SimpleFilesystemHandlerTest {
         long fileToWriteLen = fileToWrite.length();
 
         String fileName = "first file";
-        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+        writeFileInFs(fileName, fileToWrite, fileToWriteLen);
 
         assertNotNull(fsHandler.getFileOffset(fileName));
 
@@ -119,12 +119,44 @@ public class SimpleFilesystemHandlerTest {
        assertNull(fsHandler.getFileOffset(fileName));
     }
 
+    @Test
+    void should_write_to_fs_then_update_it() throws URISyntaxException, IOException {
+        File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
+        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+        long fsFileLenAfterInit = fsFile.length();
+
+        File fileToWrite = getFileFromResources("6KbFileToWrite");
+        long fileToWriteLen = fileToWrite.length();
+
+        String fileName = "first file";
+        int fileNameLen = fileName.getBytes(StandardCharsets.UTF_8).length;
+
+        writeFileInFs(fileName, fileToWrite, fileToWriteLen);
+        long writeOffset = fsHandler.getFileOffset(fileName);
+
+        try(FileInputStream updateSource = new FileInputStream(fileToWrite)){
+            fsHandler.updateAsync(fileName, updateSource, fileToWriteLen)
+                    .exceptionally(Assertions::fail)
+                    .join();
+        }
+
+        long updateOffset = fsHandler.getFileOffset(fileName);
+
+        long expectedDiff = SimpleFilesystemHandler.getFilePropertiesSize(fileNameLen) + fileToWriteLen;
+        assertEquals(expectedDiff, updateOffset - writeOffset);
+
+        long expectedFsFileSize = fsFileLenAfterInit
+                + 2L * SimpleFilesystemHandler.getFilePropertiesSize(fileNameLen)
+                + 2L * fileToWriteLen;
+        assertEquals(expectedFsFileSize, fsFile.length());
+    }
+
     private void initEmptyFs(String should_write_to_fs_then_delete_it) {
         File fsFile = tempDir.resolve(should_write_to_fs_then_delete_it).toFile();
         fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
     }
 
-    private void writeFileInFs(File fileToWrite, long fileToWriteLen, String fileName) throws FileNotFoundException {
+    private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) throws FileNotFoundException {
         FileInputStream source = new FileInputStream(fileToWrite);
         fsHandler.writeAsync(fileName, source, fileToWriteLen)
                 .thenAccept(unused -> {
