@@ -28,8 +28,7 @@ public class SimpleFilesystemHandlerTest {
 
     @Test
     void should_correctly_init_fs_and_read_its_version() throws IOException {
-        File emptyFile = tempDir.resolve("should_correctly_init_fs_and_read_its_version").toFile();
-        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(emptyFile).join();
+        initEmptyFs("should_correctly_init_fs_and_read_its_version");
 
         Long version = fsHandler.getVersion();
         assertEquals(SimpleFilesystemHandler.VERSION, version);
@@ -66,8 +65,7 @@ public class SimpleFilesystemHandlerTest {
 
     @Test
     void should_write_to_fs_then_read_it() throws URISyntaxException, IOException {
-        File fsFile = tempDir.resolve("should_write_to_fs_then_read_it-FS").toFile();
-        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+        initEmptyFs("should_write_to_fs_then_read_it-FS");
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
         long fileToWriteLen = fileToWrite.length();
@@ -100,6 +98,30 @@ public class SimpleFilesystemHandlerTest {
                 assertNull(destinationFileReader.readLine());
             }
         }
+    }
+
+    @Test
+    void should_write_to_fs_then_delete_it() throws URISyntaxException, IOException {
+        initEmptyFs("should_write_to_fs_then_delete_it");
+
+        File fileToWrite = getFileFromResources("6KbFileToWrite");
+        long fileToWriteLen = fileToWrite.length();
+
+        String fileName = "first file";
+        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+
+        assertNotNull(fsHandler.getFileOffset(fileName));
+
+        fsHandler.deleteAsync(fileName)
+                .exceptionally(Assertions::fail)
+                .join();
+
+       assertNull(fsHandler.getFileOffset(fileName));
+    }
+
+    private void initEmptyFs(String should_write_to_fs_then_delete_it) {
+        File fsFile = tempDir.resolve(should_write_to_fs_then_delete_it).toFile();
+        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
     }
 
     private void writeFileInFs(File fileToWrite, long fileToWriteLen, String fileName) throws FileNotFoundException {

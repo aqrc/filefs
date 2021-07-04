@@ -242,6 +242,45 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     /**
+     * Method marks the file with {@code filename} as deleted
+     * and removes it from cache. Or does nothing if the file
+     * with such {@code filename} doesn't exist in cache.
+     * Eventually consistent.
+     * @param filename File to delete
+     * @return CompletableFuture which indicates the result of delete
+     *         (contains an Exception if I/O error occurred)
+     */
+    @Override
+    public CompletableFuture<Void> deleteAsync(String filename) {
+        return wrapInFuture((future) -> {
+            try {
+                delete(filename);
+                future.complete(null);
+            } catch (IOException e) {
+                future.completeExceptionally(
+                        new FileFsException("Exception occurred on file \"" + filename + "\" deletion", e));
+            }
+        });
+    }
+
+    private void delete(String filename) throws IOException {
+        Long fileOffset = fileOffsetsCache.get(filename);
+
+        if (fileOffset == null) {
+            return;
+        }
+
+        ByteBuffer flagsBuffer = ByteBuffer.allocate(FLAGS_SIZE_BYTES);
+        flagsBuffer.put(ByteUtils.intToBytes(0));
+
+        synchronized (this) {
+            channel.position(fileOffset);
+            channel.write(flagsBuffer);
+            fileOffsetsCache.remove(filename, fileOffset);
+        }
+    }
+
+    /**
      * Method finds file in cache by {@code filename}
      * and writes it in {@code destination} stream.
      * If file with this name doesn't exist in the filesystem

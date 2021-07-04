@@ -25,6 +25,14 @@ public interface FilesystemHandler {
     CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize);
 
     /**
+     * Method deletes the file with {@code filename}
+     * from the filesystem.
+     * @param filename File to delete
+     * @return CompletableFuture which indicates the result of deletion
+     */
+    CompletableFuture<Void> deleteAsync(String filename);
+
+    /**
      * Reads file with {@code filename} from the filesystem
      * and writes it in {@code destination} stream.
      * @param filename File to read from filesystem
