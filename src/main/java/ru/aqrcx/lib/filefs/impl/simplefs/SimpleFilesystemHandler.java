@@ -14,6 +14,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
@@ -30,6 +31,8 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
 
     private final RandomAccessFile fs;
     private final FileChannel channel;
+    private final HashMap<String, Long> fileOffsetsCache;
+
     /**
      * Initializes a {@code SimpleFilesystemHandler}
      * with an already existing filesystem from a {@code file}.
@@ -44,6 +47,35 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         if (!VERSION.equals(fsVersion)) {
             // TODO something for back compatibility, maybe a factory
         }
+        this.fileOffsetsCache = getFileOffsets();
+    }
+
+    private HashMap<String, Long> getFileOffsets() throws IOException {
+        HashMap<String, Long> fileOffsets = new HashMap<>();
+
+        ByteBuffer filenameSizeBuffer = ByteBuffer.allocate(FILE_NAME_SIZE_BYTES);
+        ByteBuffer fileSizeBuffer = ByteBuffer.allocate(FILE_SIZE_BYTES);
+
+        long nextFileOffset = VERSION_BYTES;
+
+        while (nextFileOffset < channel.size()) {
+            channel.position(nextFileOffset);
+            channel.read(filenameSizeBuffer);
+            int filenameSize = filenameSizeBuffer.getInt();
+
+            ByteBuffer filenameBuffer = ByteBuffer.allocate(filenameSize);
+            channel.read(filenameBuffer);
+            String filename = StandardCharsets.UTF_8.decode(filenameBuffer).toString();
+            fileOffsets.put(filename, nextFileOffset);
+
+            channel.read(fileSizeBuffer);
+
+            nextFileOffset = FILE_NAME_SIZE_BYTES + filenameSize + FILE_SIZE_BYTES + fileSizeBuffer.getLong();
+            filenameSizeBuffer.clear();
+            fileSizeBuffer.clear();
+        }
+
+        return fileOffsets;
     }
 
     /**
