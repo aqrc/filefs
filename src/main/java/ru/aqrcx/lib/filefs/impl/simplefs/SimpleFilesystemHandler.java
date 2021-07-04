@@ -162,8 +162,11 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @throws IOException If some I/O error occur
      */
     Long getVersion() throws IOException {
-        fs.seek(0);
-        return fs.readLong();
+        channel.position(0);
+        ByteBuffer versionBuffer = ByteBuffer.allocate(VERSION_BYTES);
+        channel.read(versionBuffer);
+        versionBuffer.flip();
+        return versionBuffer.getLong();
     }
 
     /**
