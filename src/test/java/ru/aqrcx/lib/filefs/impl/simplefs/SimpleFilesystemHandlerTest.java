@@ -22,7 +22,7 @@ public class SimpleFilesystemHandlerTest {
 
     @AfterEach
     void cleanUpEach() throws IOException {
-        fsHandler.detach();
+        fsHandler.unmount();
         fsHandler = null;
     }
 
@@ -35,9 +35,9 @@ public class SimpleFilesystemHandlerTest {
     }
 
     @Test
-    void should_correctly_attach_fs_and_read_its_version() throws IOException, URISyntaxException {
+    void should_correctly_mount_fs_and_read_its_version() throws IOException, URISyntaxException {
         File fsFile = getFileFromResources("emptyFs");
-        fsHandler = SimpleFilesystemHandler.attachExistingFilesystemAsync(fsFile).join();
+        fsHandler = SimpleFilesystemHandler.mountExistingFilesystemAsync(fsFile).join();
 
         Long version = fsHandler.getVersion();
         assertEquals(SimpleFilesystemHandler.VERSION, version);
@@ -46,7 +46,7 @@ public class SimpleFilesystemHandlerTest {
     @Test
     void should_write_correct_amount_of_bytes_to_fs() throws URISyntaxException, IOException {
         File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
-        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+        fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
         long fsFileLenAfterInit = fsFile.length();
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
@@ -115,7 +115,7 @@ public class SimpleFilesystemHandlerTest {
     @Test
     void should_write_to_fs_then_update_it() throws URISyntaxException, IOException {
         File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
-        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+        fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
         long fsFileLenAfterInit = fsFile.length();
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
@@ -146,7 +146,7 @@ public class SimpleFilesystemHandlerTest {
 
     private void initEmptyFs(String should_write_to_fs_then_delete_it) {
         File fsFile = tempDir.resolve(should_write_to_fs_then_delete_it).toFile();
-        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+        fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
     }
 
     private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) throws IOException {

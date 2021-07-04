@@ -58,5 +58,5 @@ public interface FilesystemHandler {
      *
      * @throws IOException If some I/O error occur
      */
-    void detach() throws IOException;
+    void unmount() throws IOException;
 }

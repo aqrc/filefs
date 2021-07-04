@@ -107,31 +107,13 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @return CompletableFuture with a handler for the {@code file}'s filesystem
      *         or with an Exception if I/O error occurred
      */
-    public static CompletableFuture<SimpleFilesystemHandler> initNewFilesystemAsync(File file) {
+    public static CompletableFuture<SimpleFilesystemHandler> initThenMountFilesystemAsync(File file) {
         return wrapInFuture((future) -> {
             try {
                 future.complete(initFileSystem(file));
             } catch (IOException e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on FS init", e));
-            }
-        });
-    }
-
-    /**
-     * A method which opens the specified {@code file} as a filesystem.
-     * Filesystem in a file must be initialized in a file beforehand.
-     * @param file An existing file which already contains a filesystem
-     * @return CompletableFuture with a handler for the {@code file}'s filesystem
-     *         or with an Exception if I/O error occurred
-     */
-    public static CompletableFuture<SimpleFilesystemHandler> attachExistingFilesystemAsync(File file) {
-        return wrapInFuture((future) -> {
-            try {
-                future.complete(new SimpleFilesystemHandler(file));
-            } catch (IOException e) {
-                future.completeExceptionally(
-                        new FileFsException("Exception occurred on FS attach", e));
             }
         });
     }
@@ -155,6 +137,24 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         }
 
         return new SimpleFilesystemHandler(file);
+    }
+
+    /**
+     * A method which opens the specified {@code file} as a filesystem.
+     * Filesystem in a file must be initialized in a file beforehand.
+     * @param file An existing file which already contains a filesystem
+     * @return CompletableFuture with a handler for the {@code file}'s filesystem
+     *         or with an Exception if I/O error occurred
+     */
+    public static CompletableFuture<SimpleFilesystemHandler> mountExistingFilesystemAsync(File file) {
+        return wrapInFuture((future) -> {
+            try {
+                future.complete(new SimpleFilesystemHandler(file));
+            } catch (IOException e) {
+                future.completeExceptionally(
+                        new FileFsException("Exception occurred on FS attach", e));
+            }
+        });
     }
 
     /**
@@ -352,8 +352,14 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         destination.close();
     }
 
+    /**
+     * Forces data to be written on storage device,
+     * then closes the channel and the file.
+     *
+     * @throws IOException If some I/O error occur
+     */
     @Override
-    public void detach() throws IOException {
+    public void unmount() throws IOException {
         channel.force(true);
         channel.close();
         fs.close();
@@ -361,7 +367,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
 
     @Override
     protected void finalize() throws IOException {
-        detach();
+        unmount();
     }
 
     private static <T> CompletableFuture<T> wrapInFuture(Consumer<CompletableFuture<T>> consumer) {
