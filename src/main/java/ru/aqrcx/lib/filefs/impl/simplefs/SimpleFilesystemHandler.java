@@ -39,7 +39,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @throws IOException When {@code file} not found or other I/O error occurs
      */
     private SimpleFilesystemHandler(File file) throws IOException {
-        this.fs = new RandomAccessFile(file, "rws");
+        this.fs = new RandomAccessFile(file, "rw");
         this.channel = fs.getChannel();
         this.channel.tryLock(); // TODO handle properly
 
