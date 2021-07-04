@@ -74,18 +74,11 @@ public class SimpleFilesystemHandlerTest {
         writeFileInFs(fileName, fileToWrite, fileToWriteLen);
 
         File destinationFile = tempDir.resolve("should_write_to_fs_then_read_it-DEST").toFile();
-        FileOutputStream destination = new FileOutputStream(destinationFile);
-
-        fsHandler.readAsync(fileName, destination)
-                .thenAccept(unused -> {
-                    try {
-                        destination.close();
-                    } catch (IOException e) {
-                        fail(e);
-                    }
-                })
-                .exceptionally(Assertions::fail)
-                .join();
+        try (FileOutputStream destination = new FileOutputStream(destinationFile)) {
+            fsHandler.readAsync(fileName, destination)
+                    .exceptionally(Assertions::fail)
+                    .join();
+        }
 
         try (BufferedReader originalFileReader = new BufferedReader(new FileReader(fileToWrite))) {
             try (BufferedReader destinationFileReader = new BufferedReader(new FileReader(destinationFile))) {
@@ -156,18 +149,12 @@ public class SimpleFilesystemHandlerTest {
         fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
     }
 
-    private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) throws FileNotFoundException {
-        FileInputStream source = new FileInputStream(fileToWrite);
-        fsHandler.writeAsync(fileName, source, fileToWriteLen)
-                .thenAccept(unused -> {
-                    try {
-                        source.close();
-                    } catch (IOException e) {
-                        fail(e);
-                    }
-                })
-                .exceptionally(Assertions::fail)
-                .join();
+    private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) throws IOException {
+        try (FileInputStream source = new FileInputStream(fileToWrite)) {
+            fsHandler.writeAsync(fileName, source, fileToWriteLen)
+                    .exceptionally(Assertions::fail)
+                    .join();
+        }
     }
 
     private File getFileFromResources(String filename) throws URISyntaxException {

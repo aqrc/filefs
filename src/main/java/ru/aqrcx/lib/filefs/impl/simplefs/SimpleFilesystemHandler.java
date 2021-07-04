@@ -142,18 +142,17 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * @throws IOException When {@code file} not found or other I/O error occurs
      */
     private static SimpleFilesystemHandler initFileSystem(File file) throws IOException {
-        RandomAccessFile filesystem = new RandomAccessFile(file, "rw");
-        FileChannel channel = filesystem.getChannel();
+        try (RandomAccessFile filesystem = new RandomAccessFile(file, "rw")) {
+            try (FileChannel channel = filesystem.getChannel()) {
+                channel.truncate(VERSION_BYTES);
+                channel.write(ByteBuffer.allocateDirect(VERSION_BYTES));
 
-        channel.truncate(VERSION_BYTES);
-        channel.write(ByteBuffer.allocateDirect(VERSION_BYTES));
+                channel.position(0);
+                channel.write(ByteUtils.longToBytes(VERSION));
 
-        channel.position(0);
-        channel.write(ByteUtils.longToBytes(VERSION));
-
-        channel.force(true);
-        channel.close();
-        filesystem.close();
+                channel.force(true);
+            }
+        }
 
         return new SimpleFilesystemHandler(file);
     }
@@ -234,9 +233,9 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             channel.write(filePropertiesBuffer);
         }
 
-        ReadableByteChannel sourceChannel = Channels.newChannel(source);
-        channel.transferFrom(sourceChannel, channel.size(), sourceSize);
-        sourceChannel.close();
+        try (ReadableByteChannel sourceChannel = Channels.newChannel(source)) {
+            channel.transferFrom(sourceChannel, channel.size(), sourceSize);
+        }
 
         fileOffsetsCache.put(filename, fsLen);
     }
@@ -344,9 +343,9 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         fileSizeBuffer.flip();
         long fileSize = fileSizeBuffer.getLong();
         long fileDataOffset = fileOffset + getFilePropertiesSize(filenameLen);
-        WritableByteChannel destinationChannel = Channels.newChannel(destination);
-        channel.transferTo(fileDataOffset, fileSize, destinationChannel);
-        destinationChannel.close();
+        try (WritableByteChannel destinationChannel = Channels.newChannel(destination)) {
+            channel.transferTo(fileDataOffset, fileSize, destinationChannel);
+        }
         destination.close();
     }
 
