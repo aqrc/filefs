@@ -11,7 +11,6 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -172,6 +171,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      *
      * @param filename Name which will be assigned to file inside filesystem
      * @param source File data
+     * @param sourceSize Length of file data in bytes
      * @return CompletableFuture which indicates the result of write
      *         (contains an Exception if I/O error occurred)
      */
