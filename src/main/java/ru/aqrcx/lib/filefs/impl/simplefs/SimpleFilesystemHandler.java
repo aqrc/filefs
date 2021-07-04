@@ -236,13 +236,13 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             fsLen = channel.size();
             channel.position(fsLen);
             channel.write(filePropertiesBuffer);
-        }
 
-        try (ReadableByteChannel sourceChannel = Channels.newChannel(source)) {
-            channel.transferFrom(sourceChannel, channel.size(), sourceSize);
-        }
+            try (ReadableByteChannel sourceChannel = Channels.newChannel(source)) {
+                channel.transferFrom(sourceChannel, channel.size(), sourceSize);
+            }
 
-        fileOffsetsCache.put(filename, fsLen);
+            fileOffsetsCache.put(filename, fsLen);
+        }
     }
 
     /**
