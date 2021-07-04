@@ -27,6 +27,7 @@ public interface FilesystemHandler {
     /**
      * Method deletes the file with {@code filename}
      * from the filesystem.
+     *
      * @param filename File to delete
      * @return CompletableFuture which indicates the result of deletion
      */
@@ -35,6 +36,7 @@ public interface FilesystemHandler {
     /**
      * Reads file with {@code filename} from the filesystem
      * and writes it in {@code destination} stream.
+     *
      * @param filename File to read from filesystem
      * @param destination Stream where file data will be written
      * @return CompletableFuture which indicates the result of read
@@ -45,6 +47,7 @@ public interface FilesystemHandler {
      * Updates file with {@code filename} existing
      * in the filesystem with data from {@code stream}.
      * Exact behavior depends on implementation.
+     * 
      * @param filename Name which will be assigned to file inside filesystem
      * @param source File data
      * @param sourceSize Length of file data in bytes

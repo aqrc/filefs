@@ -35,6 +35,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * Initializes a {@code SimpleFilesystemHandler}
      * with an already existing filesystem from a {@code file}.
      * Scans the whole file, caches offsets into {@code fileOffsetsCache}.
+     *
      * @param file A valid and existing file
      * @throws IOException When {@code file} not found or other I/O error occurs
      */
@@ -142,6 +143,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     /**
      * A method which opens the specified {@code file} as a filesystem.
      * Filesystem in a file must be initialized in a file beforehand.
+     *
      * @param file An existing file which already contains a filesystem
      * @return CompletableFuture with a handler for the {@code file}'s filesystem
      *         or with an Exception if I/O error occurred
@@ -248,6 +250,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * and removes it from cache. Or does nothing if the file
      * with such {@code filename} doesn't exist in cache.
      * Eventually consistent.
+     *
      * @param filename File to delete
      * @return CompletableFuture which indicates the result of delete
      *         (contains an Exception if I/O error occurred)
@@ -287,6 +290,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      * and writes it in {@code destination} stream.
      * If file with this name doesn't exist in the filesystem
      * just closes the stream.
+     *
      * @param filename File to read from filesystem
      * @param destination Stream where file data will be written
      * @return CompletableFuture which indicates the result of read
@@ -308,6 +312,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     /**
      * Marks existing file with {@code filename} as deleted
      * and writes new one from {@code source}.
+     *
      * @param filename Name which will be assigned to file inside filesystem
      * @param source File data
      * @param sourceSize Length of file data in bytes
