@@ -152,6 +152,18 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     /**
+     * This method is needed mostly for testing,
+     * to not expose cache itself.
+     *
+     * @param filename Name of the file
+     * @return Offset of the file or null if such file
+     *         is not found in the cache
+     */
+    Long getFileOffset(String filename) {
+        return this.fileOffsetsCache.get(filename);
+    }
+
+    /**
      * Writes following data in the end of file-filesystem:
      *  - length of {@code filename} in bytes (int, 4 bytes)
      *  - {@code filename}
@@ -196,6 +208,8 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             channel.transferFrom(sourceChannel, channel.size(), sourceSize);
 
             sourceChannel.close();
+
+            fileOffsetsCache.put(filename, fsLen);
         }
     }
 

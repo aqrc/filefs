@@ -76,6 +76,7 @@ public class SimpleFilesystemHandlerTest {
                 + fileToWriteLen;
 
         assertEquals(expectedFsFileSizeAfterWrite, fsFile.length());
+        assertEquals(SimpleFilesystemHandler.VERSION_BYTES, fsHandler.getFileOffset(fileName));
     }
 
     private File getFileFromResources(String filename) throws URISyntaxException {
