@@ -42,6 +42,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     private SimpleFilesystemHandler(File file) throws IOException {
         this.fs = new RandomAccessFile(file, "rws");
         this.channel = fs.getChannel();
+        this.channel.tryLock(); // TODO handle properly
 
         Long fsVersion = getVersion();
         if (!VERSION.equals(fsVersion)) {
@@ -181,7 +182,6 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
 
         synchronized (this) {
             long fsLen = channel.size();
-            FileLock lock = channel.lock(fsLen, filePropertiesSize + sourceSize, false);
             channel.position(fsLen);
 
             ByteBuffer filePropertiesBuffer =
@@ -195,7 +195,6 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             ReadableByteChannel sourceChannel = Channels.newChannel(source);
             channel.transferFrom(sourceChannel, channel.size(), sourceSize);
 
-            lock.release();
             sourceChannel.close();
         }
     }
