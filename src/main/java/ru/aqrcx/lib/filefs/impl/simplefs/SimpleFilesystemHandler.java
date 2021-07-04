@@ -309,30 +309,6 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         });
     }
 
-    /**
-     * Marks existing file with {@code filename} as deleted
-     * and writes new one from {@code source}.
-     *
-     * @param filename Name which will be assigned to file inside filesystem
-     * @param source File data
-     * @param sourceSize Length of file data in bytes
-     * @return CompletableFuture which indicates the result of update
-     *         (contains an Exception if I/O error occurred)
-     */
-    @Override
-    public CompletableFuture<Void> updateAsync(String filename, InputStream source, long sourceSize) {
-        return wrapInFuture((future) -> {
-            try {
-                delete(filename);
-                write(filename, source, sourceSize);
-                future.complete(null);
-            } catch (IOException e) {
-                future.completeExceptionally(
-                        new FileFsException("Exception occurred on file \"" + filename + "\" update", e));
-            }
-        });
-    }
-
     private void read(String filename, OutputStream destination) throws IOException {
         Long fileOffset = fileOffsetsCache.get(filename);
 
@@ -355,6 +331,30 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             channel.transferTo(fileDataOffset, fileSize, destinationChannel);
         }
         destination.close();
+    }
+
+    /**
+     * Marks existing file with {@code filename} as deleted
+     * and writes new one from {@code source}.
+     *
+     * @param filename Name which will be assigned to file inside filesystem
+     * @param source File data
+     * @param sourceSize Length of file data in bytes
+     * @return CompletableFuture which indicates the result of update
+     *         (contains an Exception if I/O error occurred)
+     */
+    @Override
+    public CompletableFuture<Void> updateAsync(String filename, InputStream source, long sourceSize) {
+        return wrapInFuture((future) -> {
+            try {
+                delete(filename);
+                write(filename, source, sourceSize);
+                future.complete(null);
+            } catch (IOException e) {
+                future.completeExceptionally(
+                        new FileFsException("Exception occurred on file \"" + filename + "\" update", e));
+            }
+        });
     }
 
     /**
