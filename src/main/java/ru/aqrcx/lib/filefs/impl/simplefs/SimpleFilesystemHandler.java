@@ -25,6 +25,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     final static int VERSION_BYTES = Long.BYTES;
     final static int FILE_SIZE_BYTES = Long.BYTES;
     final static int FILE_NAME_SIZE_BYTES = Integer.BYTES;
+    final static int FLAGS_SIZE_BYTES = Integer.BYTES;
 
     private final RandomAccessFile fs;
     private final FileChannel channel;
@@ -33,6 +34,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     /**
      * Initializes a {@code SimpleFilesystemHandler}
      * with an already existing filesystem from a {@code file}.
+     * Scans the whole file, caches offsets into {@code fileOffsetsCache}.
      * @param file A valid and existing file
      * @throws IOException When {@code file} not found or other I/O error occurs
      */
@@ -51,6 +53,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     private HashMap<String, Long> getFileOffsets() throws IOException {
         HashMap<String, Long> fileOffsets = new HashMap<>();
 
+        ByteBuffer flagsBuffer = ByteBuffer.allocate(FLAGS_SIZE_BYTES);
         ByteBuffer filenameSizeBuffer = ByteBuffer.allocate(FILE_NAME_SIZE_BYTES);
         ByteBuffer fileSizeBuffer = ByteBuffer.allocate(FILE_SIZE_BYTES);
 
@@ -58,23 +61,39 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
 
         while (nextFileOffset < channel.size()) {
             channel.position(nextFileOffset);
-            channel.read(filenameSizeBuffer);
-            int filenameSize = filenameSizeBuffer.getInt();
 
-            ByteBuffer filenameBuffer = ByteBuffer.allocate(filenameSize);
+            channel.read(flagsBuffer);
+            int flags = flagsBuffer.getInt();
+
+            channel.read(filenameSizeBuffer);
+            int filenameLen = filenameSizeBuffer.getInt();
+
+            if (isFileDeleted(flags)) {
+                channel.position(channel.position() + filenameLen);
+                channel.read(fileSizeBuffer);
+                long fileSize = fileSizeBuffer.getLong();
+                nextFileOffset = getFilePropertiesSize(filenameLen) + fileSize;
+                continue;
+            }
+
+            ByteBuffer filenameBuffer = ByteBuffer.allocate(filenameLen);
             channel.read(filenameBuffer);
             String filename = StandardCharsets.UTF_8.decode(filenameBuffer).toString();
             fileOffsets.put(filename, nextFileOffset);
 
             channel.read(fileSizeBuffer);
-            fileSizeBuffer.flip();
+            nextFileOffset = getFilePropertiesSize(filenameLen) + fileSizeBuffer.getLong();
 
-            nextFileOffset = FILE_NAME_SIZE_BYTES + filenameSize + FILE_SIZE_BYTES + fileSizeBuffer.getLong();
+            flagsBuffer.clear();
             filenameSizeBuffer.clear();
             fileSizeBuffer.clear();
         }
 
         return fileOffsets;
+    }
+
+    private boolean isFileDeleted(int flags) {
+        return (flags >> 1 & 1) == 1;
     }
 
     /**
@@ -98,7 +117,6 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             }
         });
     }
-
 
     /**
      * A method which opens the specified {@code file} as a filesystem.
@@ -162,7 +180,16 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     /**
+     * @param filenameLength Length of filename in bytes
+     * @return Length of properties before file data in bytes
+     */
+    static int getFilePropertiesSize(int filenameLength) {
+        return FLAGS_SIZE_BYTES + FILE_NAME_SIZE_BYTES + filenameLength + FILE_SIZE_BYTES;
+    }
+
+    /**
      * Writes following data in the end of file-filesystem:
+     *  - flags
      *  - length of {@code filename} in bytes (int, 4 bytes)
      *  - {@code filename}
      *  - length of file's data (long, 8 bytes)
@@ -189,19 +216,21 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
 
     private void write(String filename, InputStream source, long sourceSize) throws IOException {
         int filenameLen = filename.getBytes(StandardCharsets.UTF_8).length;
-        int filePropertiesSize = FILE_NAME_SIZE_BYTES + filenameLen + FILE_SIZE_BYTES;
+        int filePropertiesSize = getFilePropertiesSize(filenameLen);
         long fsLen;
+        int flags = 1;
+
+        ByteBuffer filePropertiesBuffer =
+                ByteBuffer.allocate(filePropertiesSize)
+                        .put(ByteUtils.intToBytes(flags))
+                        .put(ByteUtils.intToBytes(filenameLen))
+                        .put(filename.getBytes(StandardCharsets.UTF_8))
+                        .put(ByteUtils.longToBytes(sourceSize));
+        filePropertiesBuffer.flip();
 
         synchronized (this) {
             fsLen = channel.size();
             channel.position(fsLen);
-
-            ByteBuffer filePropertiesBuffer =
-                    ByteBuffer.allocate(filePropertiesSize)
-                            .put(ByteUtils.intToBytes(filenameLen))
-                            .put(filename.getBytes(StandardCharsets.UTF_8))
-                            .put(ByteUtils.longToBytes(sourceSize));
-            filePropertiesBuffer.flip();
             channel.write(filePropertiesBuffer);
         }
 
@@ -252,7 +281,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         }
         fileSizeBuffer.flip();
         long fileSize = fileSizeBuffer.getLong();
-        long fileDataOffset = fileOffset + FILE_NAME_SIZE_BYTES + filenameLen + FILE_SIZE_BYTES;
+        long fileDataOffset = fileOffset + getFilePropertiesSize(filenameLen);
         WritableByteChannel destinationChannel = Channels.newChannel(destination);
         channel.transferTo(fileDataOffset, fileSize, destinationChannel);
         destinationChannel.close();
