@@ -17,12 +17,20 @@ public interface FilesystemHandler {
      * Creates a new file from {@code stream}
      * with {@code filename} in the filesystem.
      *
-     * @param filename Name which will be assigned to the file inside filesystem
+     * @param filename Name which will be assigned to file inside filesystem
      * @param dataStream File data
-     * @throws IOException If some I/O error occur
+     * @param sourceSize Length of file data in bytes
+     * @return CompletableFuture which indicates the result of write
      */
-    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize) throws IOException;
+    CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize);
 
+    /**
+     * Reads file with {@code filename} from the filesystem
+     * and writes it in {@code destination} stream.
+     * @param filename File to read from filesystem
+     * @param destination Stream where file data will be written
+     * @return CompletableFuture which indicates the result of read
+     */
     CompletableFuture<Void> readAsync(String filename, OutputStream destination);
 
     /**
