@@ -2,6 +2,7 @@ package ru.aqrcx.lib.filefs;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -21,6 +22,8 @@ public interface FilesystemHandler {
      * @throws IOException If some I/O error occur
      */
     CompletableFuture<Void> writeAsync(String filename, InputStream dataStream, long sourceSize) throws IOException;
+
+    CompletableFuture<Void> readAsync(String filename, OutputStream destination);
 
     /**
      * Syncs in-memory data with the filesystem,

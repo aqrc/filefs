@@ -5,16 +5,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SimpleFilesystemHandlerTest {
 
@@ -57,6 +54,57 @@ public class SimpleFilesystemHandlerTest {
         long fileToWriteLen = fileToWrite.length();
 
         String fileName = "first file";
+        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+
+        long expectedFsFileSizeAfterWrite = fsFileLenAfterInit
+                + SimpleFilesystemHandler.FILE_NAME_SIZE_BYTES
+                + fileName.getBytes(StandardCharsets.UTF_8).length
+                + SimpleFilesystemHandler.FILE_SIZE_BYTES
+                + fileToWriteLen;
+
+        assertEquals(expectedFsFileSizeAfterWrite, fsFile.length());
+        assertEquals(SimpleFilesystemHandler.VERSION_BYTES, fsHandler.getFileOffset(fileName));
+    }
+
+    @Test
+    void should_write_to_fs_then_read_it() throws URISyntaxException, IOException {
+        File fsFile = tempDir.resolve("should_write_to_fs_then_read_it-FS").toFile();
+        fsHandler = SimpleFilesystemHandler.initNewFilesystemAsync(fsFile).join();
+
+        File fileToWrite = getFileFromResources("6KbFileToWrite");
+        long fileToWriteLen = fileToWrite.length();
+
+        String fileName = "first file";
+        writeFileInFs(fileToWrite, fileToWriteLen, fileName);
+
+        File destinationFile = tempDir.resolve("should_write_to_fs_then_read_it-DEST").toFile();
+        FileOutputStream destination = new FileOutputStream(destinationFile);
+
+        fsHandler.readAsync(fileName, destination)
+                .thenAccept(unused -> {
+                    try {
+                        destination.close();
+                    } catch (IOException e) {
+                        fail(e);
+                    }
+                })
+                .exceptionally(Assertions::fail)
+                .join();
+
+        try (BufferedReader originalFileReader = new BufferedReader(new FileReader(fileToWrite))) {
+            try (BufferedReader destinationFileReader = new BufferedReader(new FileReader(destinationFile))) {
+                String originalLine;
+                String destLine;
+                while ((originalLine = originalFileReader.readLine()) != null) {
+                    destLine = destinationFileReader.readLine();
+                    assertEquals(originalLine, destLine);
+                }
+                assertNull(destinationFileReader.readLine());
+            }
+        }
+    }
+
+    private void writeFileInFs(File fileToWrite, long fileToWriteLen, String fileName) throws FileNotFoundException {
         FileInputStream source = new FileInputStream(fileToWrite);
         fsHandler.writeAsync(fileName, source, fileToWriteLen)
                 .thenAccept(unused -> {
@@ -68,15 +116,6 @@ public class SimpleFilesystemHandlerTest {
                 })
                 .exceptionally(Assertions::fail)
                 .join();
-
-        long expectedFsFileSizeAfterWrite = fsFileLenAfterInit
-                + SimpleFilesystemHandler.FILE_NAME_SIZE_BYTES
-                + fileName.getBytes(StandardCharsets.UTF_8).length
-                + SimpleFilesystemHandler.FILE_SIZE_BYTES
-                + fileToWriteLen;
-
-        assertEquals(expectedFsFileSizeAfterWrite, fsFile.length());
-        assertEquals(SimpleFilesystemHandler.VERSION_BYTES, fsHandler.getFileOffset(fileName));
     }
 
     private File getFileFromResources(String filename) throws URISyntaxException {

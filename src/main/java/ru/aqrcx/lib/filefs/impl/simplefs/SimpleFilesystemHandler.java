@@ -4,14 +4,12 @@ import ru.aqrcx.lib.filefs.FilesystemHandler;
 import ru.aqrcx.lib.filefs.impl.exception.FileFsException;
 import ru.aqrcx.lib.filefs.internal.util.ByteUtils;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
@@ -69,6 +67,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             fileOffsets.put(filename, nextFileOffset);
 
             channel.read(fileSizeBuffer);
+            fileSizeBuffer.flip();
 
             nextFileOffset = FILE_NAME_SIZE_BYTES + filenameSize + FILE_SIZE_BYTES + fileSizeBuffer.getLong();
             filenameSizeBuffer.clear();
@@ -189,11 +188,12 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     private void write(String filename, InputStream source, long sourceSize) throws IOException {
-        int filenameLen = filename.length();
+        int filenameLen = filename.getBytes(StandardCharsets.UTF_8).length;
         int filePropertiesSize = FILE_NAME_SIZE_BYTES + filenameLen + FILE_SIZE_BYTES;
+        long fsLen;
 
         synchronized (this) {
-            long fsLen = channel.size();
+            fsLen = channel.size();
             channel.position(fsLen);
 
             ByteBuffer filePropertiesBuffer =
@@ -203,14 +203,60 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
                             .put(ByteUtils.longToBytes(sourceSize));
             filePropertiesBuffer.flip();
             channel.write(filePropertiesBuffer);
-
-            ReadableByteChannel sourceChannel = Channels.newChannel(source);
-            channel.transferFrom(sourceChannel, channel.size(), sourceSize);
-
-            sourceChannel.close();
-
-            fileOffsetsCache.put(filename, fsLen);
         }
+
+        ReadableByteChannel sourceChannel = Channels.newChannel(source);
+        channel.transferFrom(sourceChannel, channel.size(), sourceSize);
+        sourceChannel.close();
+
+        fileOffsetsCache.put(filename, fsLen);
+    }
+
+    /**
+     * Method finds file in cache by {@code filename}
+     * and writes it in {@code destination} stream.
+     * If file with this name doesn't exist in the filesystem
+     * just closes the stream.
+     * @param filename File to read from filesystem
+     * @param destination Stream where file data will be written
+     * @return CompletableFuture which indicates the result of read
+     *         (contains an Exception if I/O error occurred)
+     */
+    @Override
+    public CompletableFuture<Void> readAsync(String filename, OutputStream destination) {
+        return wrapInFuture((future) -> {
+            try {
+                read(filename, destination);
+                future.complete(null);
+            } catch (IOException e) {
+                future.completeExceptionally(
+                        new FileFsException("Exception occurred on file \"" + filename + "\" read", e));
+            }
+        });
+    }
+
+    private void read(String filename, OutputStream destination) throws IOException {
+        Long fileOffset = fileOffsetsCache.get(filename);
+
+        if (fileOffset == null) {
+            destination.close();
+            return;
+        }
+
+        int filenameLen = filename.getBytes(StandardCharsets.UTF_8).length;
+        ByteBuffer fileSizeBuffer = ByteBuffer.allocate(FILE_SIZE_BYTES);
+
+        synchronized (this) {
+            channel.position(fileOffset + FILE_NAME_SIZE_BYTES + filenameLen);
+            channel.read(fileSizeBuffer);
+        }
+        fileSizeBuffer.flip();
+        long fileSize = fileSizeBuffer.getLong();
+        long fileDataOffset = fileOffset + FILE_NAME_SIZE_BYTES + filenameLen + FILE_SIZE_BYTES;
+        WritableByteChannel destinationChannel = Channels.newChannel(destination);
+        channel.transferTo(fileDataOffset, fileSize, destinationChannel);
+        destinationChannel.close();
+        destination.close();
     }
 
     @Override
