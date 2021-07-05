@@ -12,8 +12,10 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * <code>SimpleFilesystemHandler</code> is an implementation
@@ -355,6 +357,28 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
                         new FileFsException("Exception occurred on file \"" + filename + "\" update", e));
             }
         });
+    }
+
+    /**
+     * Search for filenames with {@code path} prefix
+     * in the cache. If {@code path} is null or empty
+     * returns all filenames.
+     *
+     * @param path The path of files to list
+     * @return CompletableFuture with the set of filenames
+     *         with {@code path} prefix
+     */
+    @Override
+    public CompletableFuture<Set<String>> listAsync(String path) {
+        if (path == null || path.isEmpty()) {
+            return CompletableFuture.completedFuture(fileOffsetsCache.keySet());
+        }
+
+        return CompletableFuture.completedFuture(
+                fileOffsetsCache.keySet().stream()
+                        .filter(filename -> filename.startsWith(path))
+                        .collect(Collectors.toSet())
+        );
     }
 
     /**

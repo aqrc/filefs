@@ -3,6 +3,7 @@ package ru.aqrcx.lib.filefs;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -47,13 +48,22 @@ public interface FilesystemHandler {
      * Updates file with {@code filename} existing
      * in the filesystem with data from {@code stream}.
      * Exact behavior depends on implementation.
-     * 
+     *
      * @param filename Name which will be assigned to file inside filesystem
      * @param source File data
      * @param sourceSize Length of file data in bytes
      * @return CompletableFuture which indicates the result of update
      */
     CompletableFuture<Void> updateAsync(String filename, InputStream source, long sourceSize);
+
+    /**
+     * Lists files from the specified {@code path}.
+     *
+     * @param path The path of files to list
+     * @return CompletableFuture with the set of filenames
+     *         found in the path
+     */
+    CompletableFuture<Set<String>> listAsync(String path);
 
     /**
      * Syncs in-memory data with the filesystem,
