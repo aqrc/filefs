@@ -75,7 +75,7 @@ public interface FilesystemHandler {
 
     /**
      * Syncs in-memory data with the filesystem,
-     * then closes the file.
+     * then closes the filesystem.
      *
      * @throws IOException If some I/O error occur
      */
