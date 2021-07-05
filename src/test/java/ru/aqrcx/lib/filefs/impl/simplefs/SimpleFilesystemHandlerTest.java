@@ -10,6 +10,8 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,7 +46,7 @@ public class SimpleFilesystemHandlerTest {
     }
 
     @Test
-    void should_write_correct_amount_of_bytes_to_fs() throws URISyntaxException, IOException {
+    void should_write_correct_amount_of_bytes_to_fs() throws URISyntaxException {
         File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
         fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
         long fsFileLenAfterInit = fsFile.length();
@@ -56,7 +58,7 @@ public class SimpleFilesystemHandlerTest {
         writeFileInFs(fileName, fileToWrite, fileToWriteLen);
 
         long expectedFsFileSizeAfterWrite = fsFileLenAfterInit
-                + SimpleFilesystemHandler.getFilePropertiesSize(fileName.getBytes(StandardCharsets.UTF_8).length)
+                + SimpleFilesystemHandler.getFilePropertiesSize(getUTF8StringLengthInBytes(fileName))
                 + fileToWriteLen;
 
         assertEquals(expectedFsFileSizeAfterWrite, fsFile.length());
@@ -64,7 +66,7 @@ public class SimpleFilesystemHandlerTest {
     }
 
     @Test
-    void should_write_to_fs_then_read_it() throws URISyntaxException, IOException {
+    void should_write_to_fs_then_read() throws URISyntaxException, IOException {
         initEmptyFs("should_write_to_fs_then_read_it-FS");
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
@@ -94,7 +96,7 @@ public class SimpleFilesystemHandlerTest {
     }
 
     @Test
-    void should_write_to_fs_then_delete_it() throws URISyntaxException, IOException {
+    void should_write_to_fs_then_delete() throws URISyntaxException {
         initEmptyFs("should_write_to_fs_then_delete_it");
 
         File fileToWrite = getFileFromResources("6KbFileToWrite");
@@ -113,7 +115,7 @@ public class SimpleFilesystemHandlerTest {
     }
 
     @Test
-    void should_write_to_fs_then_update_it() throws URISyntaxException, IOException {
+    void should_write_to_fs_then_update() throws URISyntaxException, IOException {
         File fsFile = tempDir.resolve("should_write_correct_amount_of_bytes_to_fs").toFile();
         fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
         long fsFileLenAfterInit = fsFile.length();
@@ -122,7 +124,7 @@ public class SimpleFilesystemHandlerTest {
         long fileToWriteLen = fileToWrite.length();
 
         String fileName = "first file";
-        int fileNameLen = fileName.getBytes(StandardCharsets.UTF_8).length;
+        int fileNameLen = getUTF8StringLengthInBytes(fileName);
 
         writeFileInFs(fileName, fileToWrite, fileToWriteLen);
         long writeOffset = fsHandler.getFileOffset(fileName);
@@ -144,18 +146,66 @@ public class SimpleFilesystemHandlerTest {
         assertEquals(expectedFsFileSize, fsFile.length());
     }
 
+    @Test
+    void should_write_several_files_to_fs_then_correctly_mount_it() throws IOException {
+        File fsFile = tempDir.resolve("should_write_several_files_to_fs_then_correctly_mount_it").toFile();
+        fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
+
+        LinkedHashMap<String, String> filenamesToContents = new LinkedHashMap<String, String>() {{
+            put("first file", "this is the first file in this filesystem");
+            put("second-file", "will be deleted");
+            put("/third_file", "third file,\nit contains\n3 lines");
+            put("/fourth/file", "just to be sure");
+        }};
+        filenamesToContents.forEach(this::writeStringInFs);
+        fsHandler.deleteAsync("second-file").join();
+
+        fsHandler.unmount();
+
+        fsHandler = SimpleFilesystemHandler.mountExistingFilesystemAsync(fsFile).join();
+
+        Set<String> allFilenames = fsHandler.listAsync("").join();
+        assertEquals(3, allFilenames.size());
+        assertTrue(allFilenames.contains("first file"));
+        assertTrue(allFilenames.contains("/third_file"));
+        assertTrue(allFilenames.contains("/fourth/file"));
+
+        Set<String> rootFilenames = fsHandler.listAsync("/").join();
+        assertEquals(2, rootFilenames.size());
+        assertTrue(rootFilenames.contains("/third_file"));
+        assertTrue(rootFilenames.contains("/fourth/file"));
+    }
+
     private void initEmptyFs(String should_write_to_fs_then_delete_it) {
         File fsFile = tempDir.resolve(should_write_to_fs_then_delete_it).toFile();
         fsHandler = SimpleFilesystemHandler.initThenMountFilesystemAsync(fsFile).join();
     }
 
-    private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) throws IOException {
+    private void writeFileInFs(String fileName, File fileToWrite, long fileToWriteLen) {
         try (FileInputStream source = new FileInputStream(fileToWrite)) {
             fsHandler.writeAsync(fileName, source, fileToWriteLen)
                     .exceptionally(Assertions::fail)
                     .join();
+        } catch (IOException e) {
+            fail(e);
         }
     }
+
+    private void writeStringInFs(String fileName, String data) {
+        long fileToWriteLen = getUTF8StringLengthInBytes(data);
+        try (ByteArrayInputStream source = new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8))) {
+            fsHandler.writeAsync(fileName, source, fileToWriteLen)
+                    .exceptionally(Assertions::fail)
+                    .join();
+        } catch (IOException e) {
+            fail(e);
+        }
+    }
+
+    private int getUTF8StringLengthInBytes(String data) {
+        return data.getBytes(StandardCharsets.UTF_8).length;
+    }
+
 
     private File getFileFromResources(String filename) throws URISyntaxException {
         URL resource = getClass().getClassLoader().getResource(filename);

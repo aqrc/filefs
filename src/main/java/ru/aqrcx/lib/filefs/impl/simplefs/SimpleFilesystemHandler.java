@@ -65,27 +65,30 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         while (nextFileOffset < channel.size()) {
             channel.position(nextFileOffset);
 
-            channel.read(flagsBuffer);
+            readAndFlip(flagsBuffer);
             int flags = flagsBuffer.getInt();
 
-            channel.read(filenameSizeBuffer);
+            readAndFlip(filenameSizeBuffer);
             int filenameLen = filenameSizeBuffer.getInt();
 
             if (isFileDeleted(flags)) {
                 channel.position(channel.position() + filenameLen);
-                channel.read(fileSizeBuffer);
+                readAndFlip(fileSizeBuffer);
                 long fileSize = fileSizeBuffer.getLong();
-                nextFileOffset = getFilePropertiesSize(filenameLen) + fileSize;
+                nextFileOffset += getFilePropertiesSize(filenameLen) + fileSize;
+                flagsBuffer.clear();
+                filenameSizeBuffer.clear();
+                fileSizeBuffer.clear();
                 continue;
             }
 
             ByteBuffer filenameBuffer = ByteBuffer.allocate(filenameLen);
-            channel.read(filenameBuffer);
+            readAndFlip(filenameBuffer);
             String filename = StandardCharsets.UTF_8.decode(filenameBuffer).toString();
             fileOffsets.put(filename, nextFileOffset);
 
-            channel.read(fileSizeBuffer);
-            nextFileOffset = getFilePropertiesSize(filenameLen) + fileSizeBuffer.getLong();
+            readAndFlip(fileSizeBuffer);
+            nextFileOffset += getFilePropertiesSize(filenameLen) + fileSizeBuffer.getLong();
 
             flagsBuffer.clear();
             filenameSizeBuffer.clear();
@@ -95,8 +98,13 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         return fileOffsets;
     }
 
+    private void readAndFlip(ByteBuffer buffer) throws IOException {
+        channel.read(buffer);
+        buffer.flip();
+    }
+
     private boolean isFileDeleted(int flags) {
-        return (flags >> 1 & 1) == 1;
+        return (flags >> 0 & 1) == 1;
     }
 
     /**
@@ -168,8 +176,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     Long getVersion() throws IOException {
         channel.position(0);
         ByteBuffer versionBuffer = ByteBuffer.allocate(VERSION_BYTES);
-        channel.read(versionBuffer);
-        versionBuffer.flip();
+        readAndFlip(versionBuffer);
         return versionBuffer.getLong();
     }
 
@@ -224,7 +231,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         int filenameLen = filename.getBytes(StandardCharsets.UTF_8).length;
         int filePropertiesSize = getFilePropertiesSize(filenameLen);
         long fsLen;
-        int flags = 1;
+        int flags = 0;
 
         ByteBuffer filePropertiesBuffer =
                 ByteBuffer.allocate(filePropertiesSize)
@@ -277,8 +284,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             return;
         }
 
-        ByteBuffer flagsBuffer = ByteBuffer.allocate(FLAGS_SIZE_BYTES);
-        flagsBuffer.put(ByteUtils.intToBytes(0));
+        ByteBuffer flagsBuffer = ByteUtils.intToBytes(1);
 
         synchronized (this) {
             channel.position(fileOffset);
