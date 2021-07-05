@@ -20,7 +20,31 @@ import java.util.stream.Collectors;
 /**
  * <code>SimpleFilesystemHandler</code> is an implementation
  * of <code>FilesystemHandler</code> and is dummy simple.
- * TODO: explain principle
+ *
+ * Filesystem structure consist of two blocks:
+ * <ul>
+ * <li>its version (8 bytes);</li>
+ * <li>files' entries one after another.</li>
+ * </ul>
+ * File entry's content is described in {@link #writeAsync(String, InputStream, long)}
+ * method documentation.
+ *
+ * Files are written one after another in the filesystem.
+ * When file is updated it previous version become marked
+ * as "deleted" and new one writes in the end of FS like a new file
+ * (this feature possibly can be used to track versions
+ * of a file with minor modification to this impl).
+ *
+ * There is no directory structure, but it can be simulated
+ * with filenames.
+ *
+ * Reads and writes happen in the synchronized blocks because
+ * we need to protect position in FileChannel from changing during
+ * the write or read. Except for methods which are called only on
+ * initialization of this object.
+ *
+ * This implementation have a cache of files in filesystem,
+ * which inits on this object creation.
  */
 public class SimpleFilesystemHandler implements FilesystemHandler {
     public final static Long VERSION = 1L;
