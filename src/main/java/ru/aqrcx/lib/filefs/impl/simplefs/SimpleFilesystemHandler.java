@@ -122,7 +122,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         return wrapInFuture((future) -> {
             try {
                 future.complete(initFileSystem(file));
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on FS init", e));
             }
@@ -162,9 +162,9 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         return wrapInFuture((future) -> {
             try {
                 future.complete(new SimpleFilesystemHandler(file));
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
-                        new FileFsException("Exception occurred on FS attach", e));
+                        new FileFsException("Exception occurred on FS mount", e));
             }
         });
     }
@@ -220,7 +220,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             try {
                 write(filename, source, sourceSize);
                 future.complete(null);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on file \"" + filename + "\" write", e));
             }
@@ -270,7 +270,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             try {
                 delete(filename);
                 future.complete(null);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on file \"" + filename + "\" deletion", e));
             }
@@ -310,7 +310,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
             try {
                 read(filename, destination);
                 future.complete(null);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on file \"" + filename + "\" read", e));
             }
@@ -358,7 +358,7 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
                 delete(filename);
                 write(filename, source, sourceSize);
                 future.complete(null);
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 future.completeExceptionally(
                         new FileFsException("Exception occurred on file \"" + filename + "\" update", e));
             }
