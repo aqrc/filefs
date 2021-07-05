@@ -208,11 +208,15 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
      *  - length of file's data (long, 8 bytes)
      *  - file's content (from {@code source})
      *
+     * Completes exceptionally if such {@code filename} already exists.
+     * Use {@link #updateAsync(String, InputStream, long)} to override
+     * existing files.
+     *
      * @param filename Name which will be assigned to file inside filesystem
      * @param source File data
      * @param sourceSize Length of file data in bytes
      * @return CompletableFuture which indicates the result of write
-     *         (contains an Exception if I/O error occurred)
+     *         (contains an Exception if I/O error occurred or file already exists)
      */
     @Override
     public CompletableFuture<Void> writeAsync(String filename, InputStream source, long sourceSize){
@@ -242,6 +246,10 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
         filePropertiesBuffer.flip();
 
         synchronized (this) {
+            if (fileOffsetsCache.containsKey(filename)) {
+                throw new IllegalArgumentException("File \"" + filename + "\" already exists");
+            }
+
             fsLen = channel.size();
             channel.position(fsLen);
             channel.write(filePropertiesBuffer);
