@@ -396,6 +396,20 @@ public class SimpleFilesystemHandler implements FilesystemHandler {
     }
 
     /**
+     * Performs defragmentation by simply shifting not deleted files up
+     * over previous files marked as deleted.
+     *
+     * NOT IMPLEMENTED YET
+     *
+     * @return CompletableFuture which indicates the result of update
+     *         (contains an Exception if I/O error occurred)
+     */
+    @Override
+    public CompletableFuture<Void> defrag() {
+        throw new RuntimeException("Not yet implemented");
+    }
+
+    /**
      * Forces data to be written on storage device,
      * then closes the channel and the file.
      *

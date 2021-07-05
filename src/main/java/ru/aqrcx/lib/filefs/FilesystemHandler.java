@@ -66,6 +66,14 @@ public interface FilesystemHandler {
     CompletableFuture<Set<String>> listAsync(String path);
 
     /**
+     * Method which performs defragmentation of filesystem.
+     *
+     * @return CompletableFuture which indicates
+     *         the result of defragmentation
+     */
+    CompletableFuture<Void> defrag();
+
+    /**
      * Syncs in-memory data with the filesystem,
      * then closes the file.
      *
